@@ -991,3 +991,45 @@ func TestMain(m *testing.M) {
 	}
 	os.Exit(rc)
 }
+
+func TestStmtResetInterrupted(t *testing.T) {
+	// Open an in-memory database
+	conn, err := sqlite.OpenConn(":memory:")
+	if err != nil {
+		t.Fatalf("failed to open database: %v", err)
+	}
+	defer conn.Close()
+
+	// Create a test table
+	stmt, err := conn.Prepare("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+	if err != nil {
+		t.Fatalf("failed to prepare statement: %v", err)
+	}
+	if _, err := stmt.Step(); err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+	stmt.Finalize()
+
+	// Prepare a statement that will be interrupted
+	stmt, err = conn.Prepare("SELECT * FROM test")
+	if err != nil {
+		t.Fatalf("failed to prepare statement: %v", err)
+	}
+	defer stmt.Finalize()
+
+	// Set interrupt channel and close it immediately to simulate interruption
+	doneCh := make(chan struct{})
+	conn.SetInterrupt(doneCh)
+	close(doneCh)
+
+	// Wait a bit to ensure interrupt is processed
+	time.Sleep(10 * time.Millisecond)
+
+	// Attempt to reset the statement - this should not panic
+	err = stmt.Reset()
+	if err == nil {
+		t.Error("expected error from Reset when interrupted, got nil")
+	} else if got, want := sqlite.ErrCode(err), sqlite.ResultInterrupt; got != want {
+		t.Errorf("expected result interrupt error: %v, but got sqlite.ErrCode(err) = %v", want, got)
+	}
+}

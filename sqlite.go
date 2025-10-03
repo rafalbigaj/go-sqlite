@@ -732,6 +732,9 @@ func (stmt *Stmt) Reset() error {
 	stmt.lastHasRow = false
 	var res ResultCode
 	for {
+		if err := stmt.interrupted(); err != nil {
+			return fmt.Errorf("sqlite: reset: %w", err)
+		}
 		res = ResultCode(lib.Xsqlite3_reset(stmt.conn.tls, stmt.stmt))
 		if res != ResultLockedSharedCache {
 			break
@@ -851,7 +854,7 @@ func (stmt *Stmt) handleBindErr(prefix string, res ResultCode) {
 // DataCount returns the number of columns in the current row of the result
 // set of prepared statement.
 //
-// https://sqlite.org/c3ref/data_count.html
+// https://www.sqlite.org/c3ref/data_count.html
 func (stmt *Stmt) DataCount() int {
 	return int(lib.Xsqlite3_data_count(stmt.conn.tls, stmt.stmt))
 }
@@ -859,7 +862,7 @@ func (stmt *Stmt) DataCount() int {
 // ColumnCount returns the number of columns in the result set returned by the
 // prepared statement.
 //
-// https://sqlite.org/c3ref/column_count.html
+// https://www.sqlite.org/c3ref/column_count.html
 func (stmt *Stmt) ColumnCount() int {
 	return int(lib.Xsqlite3_column_count(stmt.conn.tls, stmt.stmt))
 }
